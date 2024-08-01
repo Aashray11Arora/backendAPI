@@ -9,7 +9,6 @@ const fastcsv = require('fast-csv');
 const { Readable } = require('stream');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
-const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,14 +19,6 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
-
-// CORS configuration to allow all origins
-app.use(cors({
-  origin: '*', // Allow all origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
 
 // Session configuration
 app.use(session({
@@ -59,9 +50,6 @@ sql.connect(config, (err) => {
         console.log('Connected to the database');
     }
 });
-
-// Middleware to handle CORS preflight requests
-app.options('*', cors());
 
 // Example route
 app.get('/check-variable', (req, res) => {
@@ -181,7 +169,6 @@ app.get('/api/data', async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
-
 
 app.post('/update-variable', (req, res) => {
     const { newValue } = req.body;
