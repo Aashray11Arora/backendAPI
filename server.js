@@ -26,7 +26,11 @@ app.use(session({
     cookie: { secure: false } // Set to false if not using HTTPS
 }));
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://lively-sand-002a1a100.5.azurestaticapps.net', // Replace with your static web app's URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
 
