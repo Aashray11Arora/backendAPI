@@ -11,19 +11,26 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 
 const app = express();
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 3000;
 
 // Middleware setup
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*'); // Change '*' to your specific origin(s) for better security
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
+  res.header('Access-Control-Allow-Credentials', 'true'); // Add this line
   next();
 });
+
+// Handle preflight requests
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*'); // Change '*' to your specific origin(s) for better security
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true'); // Add this line
+  res.sendStatus(200);
+});
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
@@ -53,6 +60,21 @@ const config = {
 };
 
 // Connect to the database
+sql.connect(config, (err) => {
+    if (err) {
+        console.error('Database connection failed:', err);
+    } else {
+        console.log('Connected to the database');
+    }
+});
+
+// Example route
+app.get('/check-variable', (req, res) => {
+    res.json({ message: 'Check variable endpoint working!' });
+});
+
+
+// Connect to the database
 const poolPromise = sql.connect(config).then(pool => {
     if (pool) {
         console.log('Connected to the database');
@@ -62,10 +84,7 @@ const poolPromise = sql.connect(config).then(pool => {
     console.error('Database connection failed:', err);
 });
 
-// Example route
-app.get('/check-variable', (req, res) => {
-    res.json({ message: 'Check variable endpoint working!' });
-});
+
 
 // API route for data
 app.get('/api/data', async (req, res) => {
@@ -769,7 +788,7 @@ app.post('/api/uploadFile', upload.single('file'), async (req, res) => {
       .input('FileName', sql.NVarChar, file.originalname)
       .input('FileData', sql.VarBinary, fileData)
       .input('Id', sql.NVarChar, id)
-      .query('UPDATE Loan_Number2 SET FileName = @FileName, FileType = @FileData WHERE [Loan No] = @Id');
+      .query('UPDATE Loan_Number2 SET FileName = @FileName, FileData = @FileData WHERE [Loan No] = @Id');
     
     res.sendStatus(200);
   } catch (error) {
@@ -792,7 +811,7 @@ app.get('/api/downloadFile/:id', async (req, res) => {
   try {
     const result = await pool.request()
       .input('Id', sql.NVarChar, id) // Ensure this matches the type used in your database
-      .query('SELECT FileName, FileType FROM Loan_Number2 WHERE [Loan No] = @Id');
+      .query('SELECT FileName, FileData FROM Loan_Number2 WHERE [Loan No] = @Id');
 
     if (result.recordset.length === 0) {
       return res.status(404).send('File not found');
