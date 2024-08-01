@@ -21,9 +21,9 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
 
-// CORS configuration
+// CORS configuration to allow all origins
 app.use(cors({
-  origin: 'https://lively-sand-002a1a100.5.azurestaticapps.net',
+  origin: '*', // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
