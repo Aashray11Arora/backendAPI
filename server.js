@@ -18,6 +18,10 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*'); // Change '*' to your specific origin(s) for better security
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -25,12 +29,6 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*'); // Change '*' to your specific origin(s) for better security
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.sendStatus(200);
-});
 
 // Session configuration
 app.use(session({
@@ -55,12 +53,13 @@ const config = {
 };
 
 // Connect to the database
-sql.connect(config, (err) => {
-    if (err) {
-        console.error('Database connection failed:', err);
-    } else {
+const poolPromise = sql.connect(config).then(pool => {
+    if (pool) {
         console.log('Connected to the database');
     }
+    return pool;
+}).catch(err => {
+    console.error('Database connection failed:', err);
 });
 
 // Example route
@@ -70,13 +69,13 @@ app.get('/check-variable', (req, res) => {
 
 // API route for data
 app.get('/api/data', async (req, res) => {
-
   try {
     const query = (req.query.q || '').toLowerCase();
     const status = req.query.status || '';
-
     let queryString = '';
     let result;
+
+    const pool = await poolPromise; // Use the pool connection here
 
     if (query && status === 'BranchDetails') {
       queryString = `
@@ -87,10 +86,9 @@ app.get('/api/data', async (req, res) => {
               LOWER([branch_address]) LIKE '%' + @query + '%' OR
               LOWER([contact_no]) LIKE '%' + @query + '%'`;
 
-      result = await sql.query({
-        text: queryString,
-        values: [query]
-      });
+      result = await pool.request()
+        .input('query', sql.NVarChar, query)
+        .query(queryString);
     } 
     else if (query && status === 'UserDetails') {
       queryString = `
@@ -102,13 +100,12 @@ app.get('/api/data', async (req, res) => {
               LOWER([password]) LIKE '%' + @query + '%' OR
               LOWER([branches_visible]) LIKE '%' + @query + '%'`;
 
-      result = await sql.query({
-        text: queryString,
-        values: [query]
-      });
+      result = await pool.request()
+        .input('query', sql.NVarChar, query)
+        .query(queryString);
     } 
     else if (status === 'BranchDetails') {
-      result = await sql.query`
+      result = await pool.request().query`
         SELECT TOP 10 
           id,
           branch_name,
@@ -119,7 +116,7 @@ app.get('/api/data', async (req, res) => {
         FROM Branch`;
     } 
     else if (status === 'UserDetails') {
-      result = await sql.query`
+      result = await pool.request().query`
         SELECT TOP 10 
           id,
           name, 
@@ -145,10 +142,10 @@ app.get('/api/data', async (req, res) => {
         queryString += ` AND Status = @status`;
       }
 
-      result = await sql.query({
-        text: queryString,
-        values: [query, status]
-      });
+      result = await pool.request()
+        .input('query', sql.NVarChar, query)
+        .input('status', sql.NVarChar, status)
+        .query(queryString);
     } 
     else if (query) {
       queryString = `
@@ -161,18 +158,19 @@ app.get('/api/data', async (req, res) => {
               LOWER([Name]) LIKE '%' + @query + '%' OR
               LOWER([Customer Address]) LIKE '%' + @query + '%'`;
 
-      result = await sql.query({
-        text: queryString,
-        values: [query]
-      });
+      result = await pool.request()
+        .input('query', sql.NVarChar, query)
+        .query(queryString);
     } 
     else if (status) {
-      result = await sql.query`
+      result = await pool.request()
+        .input('status', sql.NVarChar, status)
+        .query`
         SELECT TOP 40 * FROM Loan_Number2
-        WHERE Status = ${status}`;
+        WHERE Status = @status`;
     } 
     else {
-      result = await sql.query`
+      result = await pool.request().query`
         SELECT TOP 40 * FROM Loan_Number2`;
     }
 
@@ -203,7 +201,7 @@ setInterval(() => {
         globalVariable = 'false'; // disable access to its contents
     }
     clientConnected = false; // Reset flag for next check
-}, 600000); // Check every 600 seconds
+}, 60000); // Check every 60 seconds
 
 // Serve login page
 
@@ -216,9 +214,12 @@ app.post('/login', async (req, res) => {
   console.log('Received password:', password);
 
   try {
-      await sql.connect(config);
-      const result = await sql.query`
-          SELECT * FROM login WHERE login_id = ${username} AND password = ${password}
+      const pool = await poolPromise;
+      const result = await pool.request()
+        .input('username', sql.NVarChar, username)
+        .input('password', sql.NVarChar, password)
+        .query`
+          SELECT * FROM login WHERE login_id = @username AND password = @password
       `;
 
       if (result.recordset.length > 0) {
@@ -248,10 +249,6 @@ function isAuthenticated(req, res, next) {
   }
 }
 
-
-
-
-
 app.post('/api/tabname', (req, res) => {
   const { tabName } = req.body;
   console.log('POST /api/tabname', { tabName });
@@ -275,53 +272,57 @@ app.post('/api/action', async (req, res) => {
   }
 
   console.log('POST /api/action', { action: status, agreementNo });
-if (status=='Accepted')
-{
+
   try {
-    await sql.connect(config);
-    await sql.query`UPDATE Loan_Number2 SET Status = ${status},
-     Remarks= '', [Date of NOC Accepted Rejected]=DATEADD(MINUTE, 330, GETUTCDATE())  WHERE [Loan No] = ${agreementNo}`;
+    const pool = await poolPromise;
+    
+    if (status === 'Accepted') {
+      await pool.request()
+        .input('status', sql.NVarChar, status)
+        .input('agreementNo', sql.NVarChar, agreementNo)
+        .query`
+          UPDATE Loan_Number2 
+          SET Status = @status,
+              Remarks = '', 
+              [Date of NOC Accepted Rejected] = DATEADD(MINUTE, 330, GETUTCDATE()) 
+          WHERE [Loan No] = @agreementNo`;
+    } else if (status === 'Rejected') {
+      await pool.request()
+        .input('status', sql.NVarChar, status)
+        .input('agreementNo', sql.NVarChar, agreementNo)
+        .query`
+          UPDATE Loan_Number2 
+          SET Status = @status,
+              [Date of NOC Accepted Rejected] = DATEADD(MINUTE, 330, GETUTCDATE()) 
+          WHERE [Loan No] = @agreementNo`;
+    } else if (status === 'Completed') {
+      await pool.request()
+        .input('status', sql.NVarChar, status)
+        .input('agreementNo', sql.NVarChar, agreementNo)
+        .query`
+          UPDATE Loan_Number2 
+          SET Status = @status,
+              Remarks = '', 
+              [Date of NOC Issued] = DATEADD(MINUTE, 330, GETUTCDATE()) 
+          WHERE [Loan No] = @agreementNo`;
+    } else {
+      await pool.request()
+        .input('status', sql.NVarChar, status)
+        .input('agreementNo', sql.NVarChar, agreementNo)
+        .query`
+          UPDATE Loan_Number2 
+          SET Status = @status,
+              Remarks = '' 
+          WHERE [Loan No] = @agreementNo`;
+    }
+    
     res.sendStatus(200);
   } catch (err) {
     console.error('POST /api/action - Error', err.message);
     res.status(500).send('Internal Server Error');
   }
-}
-if (status=='Rejected')
-  {
-    try {
-      await sql.connect(config);
-      await sql.query`UPDATE Loan_Number2 SET Status = ${status},
-       [Date of NOC Accepted Rejected]=DATEADD(MINUTE, 330, GETUTCDATE())  WHERE [Loan No] = ${agreementNo}`;
-      res.sendStatus(200);
-    } catch (err) {
-      console.error('POST /api/action - Error', err.message);
-      res.status(500).send('Internal Server Error');
-    }
-  }
-  if (status=='Completed')
-    {
-      try {
-        await sql.connect(config);
-        await sql.query`UPDATE Loan_Number2 SET Status = ${status},
-         Remarks= '',[Date of NOC Issued] = DATEADD(MINUTE, 330, GETUTCDATE())  WHERE [Loan No] = ${agreementNo}`;
-        res.sendStatus(200);
-      } catch (err) {
-        console.error('POST /api/action - Error', err.message);
-        res.status(500).send('Internal Server Error');
-      }
-    }
-else{
-  try {
-    await sql.connect(config);
-    await sql.query`UPDATE Loan_Number2 SET Status = ${status},
-    Remarks='' WHERE [Loan No] = ${agreementNo}`;
-    res.sendStatus(200);
-  } catch (err) {
-    console.error('POST /api/action - Error', err.message);
-    res.status(500).send('Internal Server Error');
-  }}
 });
+
 
 // API Endpoint to Add a New User
 app.post('/api/userdetails', async (req, res) => {
