@@ -1,6 +1,5 @@
 const express = require('express');
 const sql = require('mssql');
-const cors = require('cors');
 const session = require('express-session');
 const path = require('path');
 const multer = require('multer');
@@ -10,6 +9,7 @@ const fastcsv = require('fast-csv');
 const { Readable } = require('stream');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -18,21 +18,24 @@ const port = process.env.PORT || 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
 
+// CORS configuration
+app.use(cors({
+  origin: 'https://lively-sand-002a1a100.5.azurestaticapps.net',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Session configuration
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // Set to false if not using HTTPS
+    cookie: { secure: false } // Set to true if using HTTPS
 }));
-
-app.use(cors({
-  origin: 'https://lively-sand-002a1a100.5.azurestaticapps.net', // Replace with your static web app's URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public'))); // Adjust path as needed
 
 // Database configuration
 const config = {
@@ -57,9 +60,126 @@ sql.connect(config, (err) => {
     }
 });
 
+// Middleware to handle CORS preflight requests
+app.options('*', cors());
+
 // Example route
 app.get('/check-variable', (req, res) => {
     res.json({ message: 'Check variable endpoint working!' });
+});
+
+// API route for data
+app.get('/api/data', async (req, res) => {
+  try {
+    const query = (req.query.q || '').toLowerCase();
+    const status = req.query.status || '';
+
+    let queryString = '';
+    let result;
+
+    if (query && status === 'BranchDetails') {
+      queryString = `
+        SELECT TOP 20 * FROM Branch
+        WHERE LOWER([branch_name]) LIKE '%' + @query + '%' OR 
+              LOWER([state]) LIKE '%' + @query + '%' OR 
+              LOWER([city]) LIKE '%' + @query + '%' OR 
+              LOWER([branch_address]) LIKE '%' + @query + '%' OR
+              LOWER([contact_no]) LIKE '%' + @query + '%'`;
+
+      result = await sql.query({
+        text: queryString,
+        values: [query]
+      });
+    } 
+    else if (query && status === 'UserDetails') {
+      queryString = `
+        SELECT TOP 20 * FROM login
+        WHERE LOWER([name]) LIKE '%' + @query + '%' OR 
+              LOWER([mobile_no]) LIKE '%' + @query + '%' OR 
+              LOWER([user_type]) LIKE '%' + @query + '%' OR 
+              LOWER([login_id]) LIKE '%' + @query + '%' OR
+              LOWER([password]) LIKE '%' + @query + '%' OR
+              LOWER([branches_visible]) LIKE '%' + @query + '%'`;
+
+      result = await sql.query({
+        text: queryString,
+        values: [query]
+      });
+    } 
+    else if (status === 'BranchDetails') {
+      result = await sql.query`
+        SELECT TOP 10 
+          id,
+          branch_name,
+          state,
+          city,
+          branch_address,
+          contact_no
+        FROM Branch`;
+    } 
+    else if (status === 'UserDetails') {
+      result = await sql.query`
+        SELECT TOP 10 
+          id,
+          name, 
+          mobile_no, 
+          user_type, 
+          login_id, 
+          password, 
+          branches_visible 
+        FROM login`;
+    } 
+    else if (query && status) {
+      queryString = `
+        SELECT TOP 20 * FROM Loan_Number2
+        WHERE LOWER([Loan No]) LIKE '%' + @query + '%' OR 
+              LOWER([Status]) LIKE '%' + @query + '%' OR 
+              LOWER([Father Name]) LIKE '%' + @query + '%' OR 
+              LOWER([Source Name]) LIKE '%' + @query + '%' OR 
+              LOWER([Branch]) LIKE '%' + @query + '%' OR
+              LOWER([Name]) LIKE '%' + @query + '%' OR
+              LOWER([Customer Address]) LIKE '%' + @query + '%'`;
+
+      if (status) {
+        queryString += ` AND Status = @status`;
+      }
+
+      result = await sql.query({
+        text: queryString,
+        values: [query, status]
+      });
+    } 
+    else if (query) {
+      queryString = `
+        SELECT TOP 20 * FROM Loan_Number2
+        WHERE LOWER([Loan No]) LIKE '%' + @query + '%' OR 
+              LOWER([Status]) LIKE '%' + @query + '%' OR 
+              LOWER([Father Name]) LIKE '%' + @query + '%' OR 
+              LOWER([Source Name]) LIKE '%' + @query + '%' OR 
+              LOWER([Branch]) LIKE '%' + @query + '%' OR
+              LOWER([Name]) LIKE '%' + @query + '%' OR
+              LOWER([Customer Address]) LIKE '%' + @query + '%'`;
+
+      result = await sql.query({
+        text: queryString,
+        values: [query]
+      });
+    } 
+    else if (status) {
+      result = await sql.query`
+        SELECT TOP 40 * FROM Loan_Number2
+        WHERE Status = ${status}`;
+    } 
+    else {
+      result = await sql.query`
+        SELECT TOP 40 * FROM Loan_Number2`;
+    }
+
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('GET /api/data - Error', err.message);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 
@@ -130,126 +250,6 @@ function isAuthenticated(req, res, next) {
 
 
 
-app.get('/api/data', async (req, res) => {
-  try {
-    const query = (req.query.q || '').toLowerCase();
-    const status = req.query.status || '';
-
-    await sql.connect(config);
-    let result;
-
-    if (query && status==='BranchDetails') {
-      queryString = 'SELECT TOP 20 * FROM Branch WHERE ';
-
-      if (query) {
-        queryString += `  (
-          LOWER([branch_name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([state]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([city]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([branch_address]) LIKE '%' + '${query}' + '%' OR
-          LOWER([contact_no]) LIKE '%' + '${query}' + '%'
-        )`;
-      }
-
-
-      console.log('Executing query:', queryString);  // Log the query string
-
-      result = await sql.query(queryString);
-    } 
-    else if (query && status==='UserDetails') {
-      queryString = 'SELECT TOP 20 * FROM login WHERE ';
-
-      if (query) {
-        queryString += `  (
-          LOWER([name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([mobile_no]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([user_type]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([login_id]) LIKE '%' + '${query}' + '%' OR
-          LOWER([password]) LIKE '%' + '${query}' + '%' OR
-          LOWER([branches_visible]) LIKE '%' + '${query}' + '%' 
-        )`;
-      }
-
-
-      console.log('Executing query:', queryString);  // Log the query string
-
-      result = await sql.query(queryString);
-    } 
-
-
-    else if (status === 'BranchDetails') {
-      result = await sql.query`
-        SELECT TOP 10 
-          id,
-          branch_name,
-          state,
-          city,
-          branch_address,
-          contact_no
-        FROM Branch`;
-    } else if (status === 'UserDetails') {
-      result = await sql.query`
-        SELECT TOP 10 
-          id,
-          name, 
-          mobile_no, 
-          user_type, 
-          login_id, 
-          password, 
-          branches_visible 
-        FROM login`;
-    }
-    else if (query && status) {
-      queryString = 'SELECT TOP 20 * FROM Loan_Number2 WHERE ';
-
-      if (query) {
-        queryString += `  (
-          LOWER([Loan No]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Status]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Father Name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Source Name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Branch]) LIKE '%' + '${query}' + '%' OR
-          LOWER([Name]) LIKE '%' + '${query}' + '%' OR
-          LOWER([Customer Address]) LIKE '%' + '${query}' + '%'
-        )`;
-      }
-
-      if (status) {
-        queryString += ` AND Status = '${status}'`;
-      }
-
-      console.log('Executing query:', queryString);  // Log the query string
-
-      result = await sql.query(queryString);
-    } else if (query) {
-      queryString = 'SELECT TOP 20 * FROM Loan_Number2 WHERE ';
-
-        queryString += `  (
-          LOWER([Loan No]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Status]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Father Name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Source Name]) LIKE '%' + '${query}' + '%' OR 
-          LOWER([Branch]) LIKE '%' + '${query}' + '%' OR
-          LOWER([Name]) LIKE '%' + '${query}' + '%' OR
-          LOWER([Customer Address]) LIKE '%' + '${query}' + '%'
-        )`;
-      
-
-      console.log('Executing query:', queryString);  // Log the query string
-
-      result = await sql.query(queryString);
-    } else if (status) {
-      result = await sql.query`SELECT TOP 40 * FROM Loan_Number2 WHERE Status = ${status}`;
-    } else {
-      result = await sql.query`SELECT TOP 40 * FROM Loan_Number2`;
-    }
-
-    res.json(result.recordset);
-  } catch (err) {
-    console.error('GET /api/data - Error', err.message);
-    res.status(500).send('Internal Server Error');
-  }
-});
 
 
 app.post('/api/tabname', (req, res) => {
@@ -937,8 +937,7 @@ app.get('/api/download-file', async (req, res) => {
 });
 
 
-
 // Start the server
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
