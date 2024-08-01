@@ -430,7 +430,24 @@ app.get('/api/generate-report', async (req, res) => {
 app.get('/api/report', async (req, res) => {
   try {
     await sql.connect(config);
-    const result = await sql.query`SELECT * FROM Loan_Number2`;
+    const result = await sql.query`SELECT  [Loan No],
+  [Status],
+  [Name],
+  [Father Name],
+  [Branch],
+  [Source Name],
+  [Customer Address],
+  [Customer Number],
+  [Co Lender],
+  [Last Reciept Amt],
+  [Last Reciept date],
+  [Reason for NOC],
+  [Customer Mobile No],
+  [Dealer Mobile No],
+  [Date of NOC Applied],
+  [Date of NOC Accepted Rejected],
+  [Date of NOC Issued],
+  [Remarks], [FileName] FROM Loan_Number2`;
 
     const data = result.recordset;
     const csvStream = fastcsv.format({ headers: true });
@@ -507,14 +524,14 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
   [Source Name],
   [Customer Address],
   [Customer Number],
-  [Co-Lender],
-  [Last Reciept Amt.],
+  [Co Lender],
+  [Last Reciept Amt],
   [Last Reciept date],
   [Reason for NOC],
   [Customer Mobile No],
   [Dealer Mobile No],
   [Date of NOC Applied],
-  [Date of NOC Accepted/Rejected],
+  [Date of NOC Accepted Rejected],
   [Date of NOC Issued],
   [Remarks]
 )
@@ -527,14 +544,14 @@ SELECT
   t3.[Source Name],
   t3.[Customer Address],
   t3.[Customer Number],
-  t3.[Co-Lender],
-  t3.[Last Reciept Amt.],
+  t3.[Co Lender],
+  t3.[Last Reciept Amt],
   t3.[Last Reciept date],
   t3.[Reason for NOC],
   t3.[Customer Mobile No],
   t3.[Dealer Mobile No],
   t3.[Date of NOC Applied],
-  t3.[Date of NOC Accepted/Rejected],
+  t3.[Date of NOC Accepted Rejected],
   t3.[Date of NOC Issued],
   t3.[Remarks]
 FROM
