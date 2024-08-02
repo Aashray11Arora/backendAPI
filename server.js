@@ -471,7 +471,7 @@ app.get('/api/report', async (req, res) => {
   [Date of NOC Applied],
   [Date of NOC Accepted Rejected],
   [Date of NOC Issued],
-  [Remarks], [FileName] FROM Loan_Number2`;
+  [Remarks] FROM Loan_Number2`;
 
     const data = result.recordset;
     const csvStream = fastcsv.format({ headers: true });
@@ -499,6 +499,28 @@ app.get('/api/report', async (req, res) => {
 
 const upload = multer({ dest: 'uploads/' });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
   const file = req.file;
 
@@ -511,108 +533,167 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
   try {
     await sql.connect(config);
 
+    
+    // Step 2: Drop Test3 table if it exists
+    const checkTableQuery = `IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '${tableName}')
+                             BEGIN
+                               DROP TABLE ${tableName}
+                             END`;
+    await sql.query(checkTableQuery);
+
+    // Step 3: Create Test3 table with the adjusted columns and data types
+    const createTableQuery = `CREATE TABLE Test3 (
+  [Loan No] VARCHAR(20),
+  [Status] VARCHAR(50),
+  [Name] VARCHAR(100),
+  [Father Name] VARCHAR(100),
+  [Branch] VARCHAR(250),
+  [Source Name] VARCHAR(250),
+  [Customer Address] VARCHAR(250),
+  [Customer Number] BIGINT,
+  [Co Lender] VARCHAR(250),
+  [Last Reciept Amt] VARCHAR(50),
+  [Last Reciept date] VARCHAR(250),  -- Prefer DATE or DATETIME instead of VARCHAR
+  [Reason for NOC] VARCHAR(250),
+  [Customer Mobile No] VARCHAR(15), -- Use VARCHAR for phone numbers
+  [Dealer Mobile No] VARCHAR(15),
+  [Date of NOC Applied] VARCHAR(250),
+  [Date of NOC Accepted Rejected] VARCHAR(250),
+  [Date of NOC Issued] VARCHAR(250),
+  [Remarks] VARCHAR(250)
+);
+`;
+
+    await sql.query(createTableQuery);
+
     const data = [];
     fs.createReadStream(file.path)
       .pipe(csvParser())
       .on('data', row => data.push(row))
       .on('end', async () => {
         if (data.length > 0) {
-          const columns = Object.keys(data[0]);
-
-          const checkTableQuery = `IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '${tableName}')
-                                   BEGIN
-                                     DROP TABLE ${tableName}
-                                   END`;
-          await sql.query(checkTableQuery);
-
-          const createTableQuery = `CREATE TABLE ${tableName} (${columns.map(col => `[${col}] VARCHAR(MAX)`).join(', ')})`;
-          await sql.query(createTableQuery);
+          const csvColumns = Object.keys(data[0]);
 
           const batchSize = 1000; 
           for (let i = 0; i < data.length; i += batchSize) {
             const batch = data.slice(i, i + batchSize);
-            const values = batch.map(row => `(${columns.map(col => `'${row[col].replace(/'/g, "''")}'`).join(', ')})`).join(', ');
-            const columnsQuoted = columns.map(col => `[${col}]`).join(', ');
+            const values = batch.map(row => `(${csvColumns.map(col => `'${row[col].replace(/'/g, "''")}'`).join(', ')})`).join(', ');
+            const columnsQuoted = csvColumns.map(col => `[${col}]`).join(', ');
             const insertQuery = `INSERT INTO ${tableName} (${columnsQuoted}) VALUES ${values}`;
-
             await sql.query(insertQuery);
           }
 
+          // Step 4: Add the FileName and FileData columns to Test3
+          const addColumnsQuery = `ALTER TABLE ${tableName} ADD [FileName] NVARCHAR(MAX), [FileData] VARBINARY(MAX)`;
+          await sql.query(addColumnsQuery);
+
+          // Merge and cleanup queries as in the original code
           const mergeQuery = `
             INSERT INTO [dbo].[Loan_Number2] (
-  [Loan No],
-  [Status],
-  [Name],
-  [Father Name],
-  [Branch],
-  [Source Name],
-  [Customer Address],
-  [Customer Number],
-  [Co Lender],
-  [Last Reciept Amt],
-  [Last Reciept date],
-  [Reason for NOC],
-  [Customer Mobile No],
-  [Dealer Mobile No],
-  [Date of NOC Applied],
-  [Date of NOC Accepted Rejected],
-  [Date of NOC Issued],
-  [Remarks]
-)
-SELECT
-  t3.[Loan No],
-  t3.[Status],
-  t3.[Name],
-  t3.[Father Name],
-  t3.[Branch],
-  t3.[Source Name],
-  t3.[Customer Address],
-  t3.[Customer Number],
-  t3.[Co Lender],
-  t3.[Last Reciept Amt],
-  t3.[Last Reciept date],
-  t3.[Reason for NOC],
-  t3.[Customer Mobile No],
-  t3.[Dealer Mobile No],
-  t3.[Date of NOC Applied],
-  t3.[Date of NOC Accepted Rejected],
-  t3.[Date of NOC Issued],
-  t3.[Remarks]
-FROM
-  [dbo].[Test3] t3
-WHERE
-  NOT EXISTS (
-    SELECT 1
-    FROM [dbo].[Loan_Number2] ln
-    WHERE ln.[Loan No] = t3.[Loan No]
-  ); `;
+              [Loan No],
+              [Status],
+              [Name],
+              [Father Name],
+              [Branch],
+              [Source Name],
+              [Customer Address],
+              [Customer Number],
+              [Co Lender],
+              [Last Reciept Amt],
+              [Last Reciept date],
+              [Reason for NOC],
+              [Customer Mobile No],
+              [Dealer Mobile No],
+              [Date of NOC Applied],
+              [Date of NOC Accepted Rejected],
+              [Date of NOC Issued],
+              [Remarks],
+              [FileName],
+              [FileData]
+            )
+            SELECT
+              t3.[Loan No],
+              t3.[Status],
+              t3.[Name],
+              t3.[Father Name],
+              t3.[Branch],
+              t3.[Source Name],
+              t3.[Customer Address],
+              t3.[Customer Number],
+              t3.[Co Lender],
+              t3.[Last Reciept Amt],
+              t3.[Last Reciept date],
+              t3.[Reason for NOC],
+              t3.[Customer Mobile No],
+              t3.[Dealer Mobile No],
+              t3.[Date of NOC Applied],
+              t3.[Date of NOC Accepted Rejected],
+              t3.[Date of NOC Issued],
+              t3.[Remarks],
+              t3.[FileName],
+              t3.[FileData]
+            FROM
+              [dbo].[Test3] t3
+            WHERE
+              NOT EXISTS (
+                SELECT 1
+                FROM [dbo].[Loan_Number2] ln
+                WHERE ln.[Loan No] = t3.[Loan No]
+              ); 
+          `;
 
           await sql.query(mergeQuery);
 
           const cleanupQuery = `
             DELETE FROM [dbo].[Loan_Number2]
-WHERE
-  [Loan No] IS NULL OR [Loan No] = '' AND
-  [Status] IS NULL OR [Status] = '' AND
-  [Name] IS NULL OR [Name] = '' AND
-  [Father Name] IS NULL OR [Father Name] = '' AND
-  [Branch] IS NULL OR [Branch] = '' AND
-  [Source Name] IS NULL OR [Source Name] = '' AND
-  [Customer Address] IS NULL OR [Customer Address] = '' AND
-  [Customer Number] IS NULL OR [Customer Number] = '' AND
-  [Co-Lender] IS NULL OR [Co-Lender] = '' AND
-  [Last Reciept Amt.] IS NULL OR [Last Reciept Amt.] = '' AND
-  [Last Reciept date] IS NULL OR [Last Reciept date] = '' AND
-  [Reason for NOC] IS NULL OR [Reason for NOC] = '' AND
-  [Customer Mobile No] IS NULL OR [Customer Mobile No] = '' AND
-  [Dealer Mobile No] IS NULL OR [Dealer Mobile No] = '' AND
-  [Date of NOC Applied] IS NULL OR [Date of NOC Applied] = '' AND
-  [Date of NOC Accepted/Rejected] IS NULL OR [Date of NOC Accepted/Rejected] = '' AND
-  [Date of NOC Issued] IS NULL OR [Date of NOC Issued] = '' AND
-  [Remarks] IS NULL OR [Remarks] = '';
-
+            WHERE
+              ([Loan No] IS NULL OR [Loan No] = '') AND
+              ([Status] IS NULL OR [Status] = '') AND
+              ([Name] IS NULL OR [Name] = '') AND
+              ([Father Name] IS NULL OR [Father Name] = '') AND
+              ([Branch] IS NULL OR [Branch] = '') AND
+              ([Source Name] IS NULL OR [Source Name] = '') AND
+              ([Customer Address] IS NULL OR [Customer Address] = '') AND
+              ([Customer Number] IS NULL OR [Customer Number] = '') AND
+              ([Co Lender] IS NULL OR [Co Lender] = '') AND
+              ([Last Reciept Amt] IS NULL OR [Last Reciept Amt] = '') AND
+              ([Last Reciept date] IS NULL OR [Last Reciept date] = '') AND
+              ([Reason for NOC] IS NULL OR [Reason for NOC] = '') AND
+              ([Customer Mobile No] IS NULL OR [Customer Mobile No] = '') AND
+              ([Dealer Mobile No] IS NULL OR [Dealer Mobile No] = '') AND
+              ([Date of NOC Applied] IS NULL) AND
+              ([Date of NOC Accepted Rejected] IS NULL) AND
+              ([Date of NOC Issued] IS NULL) AND
+              ([FileName] IS NULL ) AND
+              ([FileData] IS NULL ) AND
+              ([Remarks] IS NULL OR [Remarks] = '');
           `;
           await sql.query(cleanupQuery);
+
+          const dropTest3Query = `DROP TABLE [dbo].[Test3]`;
+          await sql.query(dropTest3Query);
+
+          const clearLoan = `UPDATE [dbo].[Loan_Number2]
+SET 
+  [Date of NOC Applied] = NULL,
+  [Date of NOC Accepted Rejected] = NULL,
+  [Date of NOC Issued] = NULL
+WHERE 
+  [Date of NOC Applied] = '1900-01-01T00:00:00.000Z' OR
+  [Date of NOC Accepted Rejected] = '1900-01-01T00:00:00.000Z' OR
+  [Date of NOC Issued] = '1900-01-01T00:00:00.000Z';
+`;
+          await sql.query(clearLoan);
+
+          const ClearLoan2 = `UPDATE [dbo].[Loan_Number2]
+SET 
+  [Customer Mobile No] = NULL,
+  [Dealer Mobile No] = NULL
+WHERE 
+  [Customer Mobile No] = '0' OR
+  [Dealer Mobile No] = '0';`;
+          await sql.query(ClearLoan2);
+
 
           res.sendStatus(200);
         } else {
@@ -624,6 +705,18 @@ WHERE
     res.status(500).send('Internal Server Error');
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 app.post('/api/delete-completed', async (req, res) => {
   try {
@@ -819,15 +912,23 @@ app.get('/api/downloadFile/:id', async (req, res) => {
 
     const file = result.recordset[0];
     
+    // Check if the file data exists and is not null
+    if (!file.FileData) {
+      return res.status(404).send('File data not found');
+    }
+
     // Set headers for file download as a PDF
-    res.setHeader('Content-Disposition', `attachment; filename=${file.FileName}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=${file.FileName}`);
     res.setHeader('Content-Type', 'application/pdf');
-    res.send(file.FileType);  // Send the file data as a response
+    
+    // Send the file data as a response
+    res.send(file.FileData);
   } catch (error) {
     console.error('Error downloading file:', error);
     res.status(500).send('Server error');
   }
 });
+
 
 
 
