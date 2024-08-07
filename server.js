@@ -1056,7 +1056,129 @@ app.get('/api/download-file', async (req, res) => {
     res.status(500).send('Error fetching file');
   }
 });
+app.post('/api/apply-noc2', async (req, res) => {
+  const { agreementNo, LastReceiptAmt, LastReceiptDate, ReasonForNoc, CustomerMobileNo, DealerMobileNo } = req.body;
 
+  // Check if all required fields are provided and validate the mobile numbers
+  const isCustomerMobileValid = CustomerMobileNo === '' || /^[0-9]{10}$/.test(CustomerMobileNo);
+  const isDealerMobileValid = DealerMobileNo === '' || /^[0-9]{10}$/.test(DealerMobileNo);
+
+  if (!agreementNo || !LastReceiptAmt || !LastReceiptDate || !ReasonForNoc || (!isCustomerMobileValid && !isDealerMobileValid)) {
+    return res.status(400).json({ success: false, message: 'All fields are required and mobile numbers must be 10 digits.' });
+  }
+
+  // Set empty strings to NULL
+  const customerMobile = CustomerMobileNo === '' ? null : `'${CustomerMobileNo}'`;
+  const dealerMobile = DealerMobileNo === '' ? null : `'${DealerMobileNo}'`;
+
+  try {
+    // Connect to the database
+    await sql.connect(config);
+
+    // Fetch the current status
+    const currentStatusResult = await sql.query(`
+      SELECT Status
+      FROM Loan_Number2
+      WHERE [Loan No] = '${agreementNo}';
+    `);
+
+    // Determine new status
+    const currentStatus = currentStatusResult.recordset[0]?.Status;
+    let newStatus = 'Applied'; // Default status
+
+    if (currentStatus === 'Rejected') {
+      newStatus = 'Re-Applied';
+    }
+
+    // Update data in Loan_Number2 table
+    await sql.query(`
+      UPDATE Loan_Number2
+      SET
+        Status = '${newStatus}',
+        [Last Reciept Amt] = '${LastReceiptAmt}',
+        [Last Reciept date] = '${LastReceiptDate}',
+        [Reason for Noc] = '${ReasonForNoc}',
+        [Customer Mobile No] = ${customerMobile},
+        [Dealer Mobile No] = ${dealerMobile},
+        [Date of NOC Applied] = DATEADD(MINUTE, 330, GETUTCDATE())
+      WHERE [Loan No] = '${agreementNo}';
+    `);
+
+    res.status(200).json({ success: true, message: 'NOC application successfully updated.' });
+  } catch (error) {
+    console.error('Error updating data:', error);
+    res.status(500).json({ success: false, message: 'Failed to update status.' });
+  } finally {
+    // Close the database connection
+    await sql.close();
+  }
+});
+
+// Route to handle the search request
+app.post('/api/get-info2', async (req, res) => {
+  const { agreementNo } = req.body;
+  console.log('Received data:', { agreementNo });
+
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool.request()
+      .input('agreementNo', sql.NVarChar, agreementNo)
+      .query('SELECT Status, [Loan No], Branch, [Name], [Father Name], [Source Name], [Customer Address], [Customer Number], [FileName] FROM Loan_Number2 WHERE [Loan No]=@agreementNo'); // Adjust column name if necessary
+
+    if (result.recordset.length > 0) {
+      res.status(200).json(result.recordset[0]); // Send the first matching record
+    } else {
+      res.status(404).json({ message: 'No record found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+
+
+// Serve static files from the 'files' directory
+app.use('/files', express.static(path.join(__dirname, 'files')));
+
+// Endpoint to handle file downloads
+app.get('/api/downloadFile2/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).send('ID not provided');
+  }
+
+  const pool = await sql.connect(config);
+
+  try {
+    const result = await pool.request()
+      .input('Id', sql.NVarChar, id) // Ensure this matches the type used in your database
+      .query('SELECT FileName, FileData FROM Loan_Number2 WHERE [Loan No] = @Id');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).send('File not found');
+    }
+
+    const file = result.recordset[0];
+    
+    // Check if the file data exists and is not null
+    if (!file.FileData) {
+      return res.status(404).send('File data not found');
+    }
+
+    // Set headers for file download as a PDF
+    res.setHeader('Content-Disposition', `attachment; filename=${file.FileName}`);
+    res.setHeader('Content-Type', 'application/pdf');
+    
+    // Send the file data as a response
+    res.send(file.FileData);
+  } catch (error) {
+    console.error('Error downloading file:', error);
+    res.status(500).send('Server error');
+  }
+});
 
 // Start the server
 app.listen(port, () => {
