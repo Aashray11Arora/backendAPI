@@ -463,8 +463,8 @@ app.get('/api/report', async (req, res) => {
   [Customer Address],
   [Customer Number],
   [Co Lender],
-  [Last Reciept Amt],
-  [Last Reciept date],
+  [Last receipt Amt],
+  [Last receipt date],
   [Reason for NOC],
   [Customer Mobile No],
   [Dealer Mobile No],
@@ -1003,8 +1003,8 @@ app.post('/api/apply-noc', async (req, res) => {
       UPDATE Loan_Number2
       SET
         Status = 'Applied',
-        [Last Reciept Amt] = '${LastReceiptAmt}',
-        [Last Reciept date] = '${LastReceiptDate}',
+        [Last Receipt Amt] = '${LastReceiptAmt}',
+        [Last receipt date] = '${LastReceiptDate}',
         [Reason for Noc] = '${ReasonForNoc}',
         [Customer Mobile No] = ${customerMobile},
         [Dealer Mobile No] = ${dealerMobile},
@@ -1097,8 +1097,8 @@ app.post('/api/apply-noc2', async (req, res) => {
       UPDATE Loan_Number2
       SET
         Status = '${newStatus}',
-        [Last Reciept Amt] = '${LastReceiptAmt}',
-        [Last Reciept date] = '${LastReceiptDate}',
+        [Last receipt Amt] = '${LastReceiptAmt}',
+        [Last receipt date] = '${LastReceiptDate}',
         [Reason for Noc] = '${ReasonForNoc}',
         [Customer Mobile No] = ${customerMobile},
         [Dealer Mobile No] = ${dealerMobile},
