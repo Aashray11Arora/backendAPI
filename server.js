@@ -541,24 +541,26 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
 
     // Step 3: Create Test3 table with the adjusted columns and data types
     const createTableQuery = `CREATE TABLE Test3 (
-  [Loan No] VARCHAR(20),
-  [Status] VARCHAR(50),
-  [Name] VARCHAR(100),
-  [Father Name] VARCHAR(100),
-  [Branch] VARCHAR(250),
-  [Source Name] VARCHAR(250),
-  [Customer Address] VARCHAR(250),
-  [Customer Number] BIGINT,
-  [Co Lender] VARCHAR(250),
-  [Last Reciept Amt] VARCHAR(50),
-  [Last Reciept date] VARCHAR(250),  -- Prefer DATE or DATETIME instead of VARCHAR
-  [Reason for NOC] VARCHAR(250),
-  [Customer Mobile No] VARCHAR(15), -- Use VARCHAR for phone numbers
-  [Dealer Mobile No] VARCHAR(15),
-  [Date of NOC Applied] VARCHAR(250),
-  [Date of NOC Accepted Rejected] VARCHAR(250),
-  [Date of NOC Issued] VARCHAR(250),
-  [Remarks] VARCHAR(250)
+    Loan_No INT,                      
+    Status VARCHAR(250),               
+    Name VARCHAR(250),                -- Assuming Name is a string with a max length of 100 characters.
+    Father_Name VARCHAR(250),         -- Assuming Father Name is a string with a max length of 100 characters.
+    Branch VARCHAR(250),              -- Assuming Branch is a string with a max length of 100 characters.
+    Source_Name VARCHAR(250),         -- Assuming Source Name is a string with a max length of 100 characters.
+    Customer_Address VARCHAR(250),            -- Assuming Customer Address can be long text.
+    Customer_Number bigint,      -- Assuming Customer Number is a string with a max length of 50 characters.
+    Co_Lender VARCHAR(100),           -- Assuming Co Lender is a string with a max length of 100 characters.
+    Last_Receipt_Amt VARCHAR(250),  -- Assuming Last Receipt Amount is a decimal with up to 15 digits, 2 of which are after the decimal point.
+    Last_Receipt_Date VARCHAR(250),           -- Assuming Last Receipt Date is a date.
+    Reason_for_NOC VARCHAR(50),              -- Assuming Reason for NOC is a long text.
+    Customer_Mobile_No bigint,   -- Assuming Customer Mobile Number is a string with a max length of 15 characters.
+    Dealer_Mobile_No bigint,     -- Assuming Dealer Mobile Number is a string with a max length of 15 characters.
+    Date_of_NOC_Applied DATETIME2,         -- Assuming Date of NOC Applied is a date.
+    Date_of_NOC_Accepted_Rejected DATETIME2, -- Assuming Date of NOC Accepted/Rejected is a date.
+    Date_of_NOC_Issued DATETIME2,          -- Assuming Date of NOC Issued is a date.
+    Remarks VARCHAR(250),                     -- Assuming Remarks is a long text.
+    FileData varbinary(MAX),                    -- Assuming FileData is a binary large object for storing binary data.
+    FileName VARCHAR(255)             -- Assuming FileName is a string with a max length of 255 characters.
 );
 `;
 
