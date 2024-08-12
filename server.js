@@ -67,6 +67,8 @@ sql.connect(config, (err) => {
         console.log('Connected to the database');
     }
 });
+
+// Example route
 app.get('/check-variable', (req, res) => {
     res.json({ message: 'Check variable endpoint working!' });
 });
@@ -274,7 +276,7 @@ app.post('/api/tabname', (req, res) => {
 
 app.post('/api/action', async (req, res) => {
   const { action, agreementNo } = req.body;
-
+  
   let status;
   if (action === 'Accept') {
     status = 'Accepted';
@@ -292,7 +294,7 @@ app.post('/api/action', async (req, res) => {
 
   try {
     const pool = await poolPromise;
-
+    
     if (status === 'Accepted') {
       await pool.request()
         .input('status', sql.NVarChar, status)
@@ -332,7 +334,7 @@ app.post('/api/action', async (req, res) => {
               Remarks = '' 
           WHERE [Loan No] = @agreementNo`;
     }
-
+    
     res.sendStatus(200);
   } catch (err) {
     console.error('POST /api/action - Error', err.message);
@@ -531,7 +533,7 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
   try {
     await sql.connect(config);
 
-
+    
     // Step 2: Drop Test3 table if it exists
     const checkTableQuery = `IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '${tableName}')
                              BEGIN
@@ -541,27 +543,27 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
 
     // Step 3: Create Test3 table with the adjusted columns and data types
     const createTableQuery = `CREATE TABLE Test3 (
-    Loan_No INT,                      
-    Status VARCHAR(250),               
-    Name VARCHAR(250),                -- Assuming Name is a string with a max length of 100 characters.
-    Father_Name VARCHAR(250),         -- Assuming Father Name is a string with a max length of 100 characters.
-    Branch VARCHAR(250),              -- Assuming Branch is a string with a max length of 100 characters.
-    Source_Name VARCHAR(250),         -- Assuming Source Name is a string with a max length of 100 characters.
-    Customer_Address VARCHAR(250),            -- Assuming Customer Address can be long text.
-    Customer_Number bigint,      -- Assuming Customer Number is a string with a max length of 50 characters.
-    Co_Lender VARCHAR(100),           -- Assuming Co Lender is a string with a max length of 100 characters.
-    Last_Receipt_Amt VARCHAR(250),  -- Assuming Last Receipt Amount is a decimal with up to 15 digits, 2 of which are after the decimal point.
-    Last_Receipt_Date VARCHAR(250),           -- Assuming Last Receipt Date is a date.
-    Reason_for_NOC VARCHAR(50),              -- Assuming Reason for NOC is a long text.
-    Customer_Mobile_No bigint,   -- Assuming Customer Mobile Number is a string with a max length of 15 characters.
-    Dealer_Mobile_No bigint,     -- Assuming Dealer Mobile Number is a string with a max length of 15 characters.
-    Date_of_NOC_Applied DATETIME2,         -- Assuming Date of NOC Applied is a date.
-    Date_of_NOC_Accepted_Rejected DATETIME2, -- Assuming Date of NOC Accepted/Rejected is a date.
-    Date_of_NOC_Issued DATETIME2,          -- Assuming Date of NOC Issued is a date.
-    Remarks VARCHAR(250),                     -- Assuming Remarks is a long text.
-    FileData varbinary(MAX),                    -- Assuming FileData is a binary large object for storing binary data.
-    FileName VARCHAR(255)             -- Assuming FileName is a string with a max length of 255 characters.
+    [Loan No] varchar(50),                        -- Assuming Loan No is an integer. Adjust type if needed.
+    [Status] VARCHAR(50),                 -- Assuming Status is a string with a max length of 50 characters.
+    [Name] VARCHAR(250),                  -- Assuming Name is a string with a max length of 100 characters.
+    [Father Name] VARCHAR(250),           -- Assuming Father Name is a string with a max length of 100 characters.
+    [Branch] VARCHAR(250),                -- Assuming Branch is a string with a max length of 100 characters.
+    [Source Name] VARCHAR(250),           -- Assuming Source Name is a string with a max length of 100 characters.
+    [Customer Address] VARCHAR(250),              -- Assuming Customer Address can be long text.
+    [Customer Number] bigint,        -- Assuming Customer Number is a string with a max length of 50 characters.
+    [Co Lender] VARCHAR(250),             -- Assuming Co Lender is a string with a max length of 100 characters.
+    [Last Receipt Amt] VARCHAR(250),    -- Assuming Last Receipt Amount is a decimal with up to 15 digits, 2 of which are after the decimal point.
+    [Last Receipt Date] VARCHAR(250),             -- Assuming Last Receipt Date is a date.
+    [Reason for NOC] VARCHAR(50),                -- Assuming Reason for NOC is a long text.
+    [Customer Mobile No] bigint,     -- Assuming Customer Mobile Number is a string with a max length of 15 characters.
+    [Dealer Mobile No] bigint,       -- Assuming Dealer Mobile Number is a string with a max length of 15 characters.
+    [Date of NOC Applied] DATETIME2,           -- Assuming Date of NOC Applied is a date.
+    [Date of NOC Accepted Rejected] DATETIME2, -- Assuming Date of NOC Accepted/Rejected is a date.
+    [Date of NOC Issued] DATETIME2,            -- Assuming Date of NOC Issued is a date.
+    [Remarks] VARCHAR(250)
 );
+
+
 `;
 
     await sql.query(createTableQuery);
@@ -599,8 +601,8 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
               [Customer Address],
               [Customer Number],
               [Co Lender],
-              [Last Reciept Amt],
-              [Last Reciept date],
+              [Last Receipt Amt],
+              [Last Receipt date],
               [Reason for NOC],
               [Customer Mobile No],
               [Dealer Mobile No],
@@ -621,8 +623,8 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
               t3.[Customer Address],
               t3.[Customer Number],
               t3.[Co Lender],
-              t3.[Last Reciept Amt],
-              t3.[Last Reciept date],
+              t3.[Last Receipt Amt],
+              t3.[Last Receipt date],
               t3.[Reason for NOC],
               t3.[Customer Mobile No],
               t3.[Dealer Mobile No],
@@ -656,8 +658,8 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
               ([Customer Address] IS NULL OR [Customer Address] = '') AND
               ([Customer Number] IS NULL OR [Customer Number] = '') AND
               ([Co Lender] IS NULL OR [Co Lender] = '') AND
-              ([Last Reciept Amt] IS NULL OR [Last Reciept Amt] = '') AND
-              ([Last Reciept date] IS NULL OR [Last Reciept date] = '') AND
+              ([Last Receipt Amt] IS NULL OR [Last Receipt Amt] = '') AND
+              ([Last Receipt date] IS NULL OR [Last Receipt date] = '') AND
               ([Reason for NOC] IS NULL OR [Reason for NOC] = '') AND
               ([Customer Mobile No] IS NULL OR [Customer Mobile No] = '') AND
               ([Dealer Mobile No] IS NULL OR [Dealer Mobile No] = '') AND
@@ -882,7 +884,7 @@ app.post('/api/uploadFile', upload.single('file'), async (req, res) => {
       .input('FileData', sql.VarBinary, fileData)
       .input('Id', sql.NVarChar, id)
       .query('UPDATE Loan_Number2 SET FileName = @FileName, FileData = @FileData WHERE [Loan No] = @Id');
-
+    
     res.sendStatus(200);
   } catch (error) {
     console.error('Error uploading file:', error);
@@ -911,7 +913,7 @@ app.get('/api/downloadFile/:id', async (req, res) => {
     }
 
     const file = result.recordset[0];
-
+    
     // Check if the file data exists and is not null
     if (!file.FileData) {
       return res.status(404).send('File data not found');
@@ -920,7 +922,7 @@ app.get('/api/downloadFile/:id', async (req, res) => {
     // Set headers for file download as a PDF
     res.setHeader('Content-Disposition', `attachment; filename=${file.FileName}`);
     res.setHeader('Content-Type', 'application/pdf');
-
+    
     // Send the file data as a response
     res.send(file.FileData);
   } catch (error) {
@@ -970,7 +972,7 @@ app.post('/api/updateCoLender', async (req, res) => {
         SET [Co Lender] = @CoLender, Status = 'Accepted',[Date of NOC Accepted Rejected]=DATEADD(MINUTE, 330, GETUTCDATE()) 
         WHERE [Loan No] = @AgreementNo
       `);
-
+    
     res.sendStatus(200);
   } catch (error) {
     console.error('Error updating co-lender:', error);
@@ -1162,7 +1164,7 @@ app.get('/api/downloadFile2/:id', async (req, res) => {
     }
 
     const file = result.recordset[0];
-
+    
     // Check if the file data exists and is not null
     if (!file.FileData) {
       return res.status(404).send('File data not found');
@@ -1171,7 +1173,7 @@ app.get('/api/downloadFile2/:id', async (req, res) => {
     // Set headers for file download as a PDF
     res.setHeader('Content-Disposition', `attachment; filename=${file.FileName}`);
     res.setHeader('Content-Type', 'application/pdf');
-
+    
     // Send the file data as a response
     res.send(file.FileData);
   } catch (error) {
@@ -1179,7 +1181,6 @@ app.get('/api/downloadFile2/:id', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
-
 
 // Start the server
 app.listen(port, () => {
